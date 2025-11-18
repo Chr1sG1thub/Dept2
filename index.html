@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>French Département Plate Tracker with Voice Input</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    crossorigin=""
+  />
+  <style>
+    #map {
+      height: 600px;
+      margin-bottom: 20px;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 10px;
+    }
+    label, input, button {
+      font-size: 16px;
+      margin: 5px 0 10px 0;
+    }
+    .dept-label {
+      font-weight: bold;
+      color: white;
+      text-shadow: 0 0 3px black;
+      pointer-events: none;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 400px;
+      margin-top: 10px;
+      cursor: default;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+      user-select: none;
+    }
+    th.sort-asc::after {
+      content: " ▲";
+    }
+    th.sort-desc::after {
+      content: " ▼";
+    }
+    #voice-status {
+      font-style: italic;
+      margin-left: 10px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h2>Track Seen French Départements</h2>
+  <label for="dept-input">Enter département number (e.g. 75): </label>
+  <input type="text" id="dept-input" maxlength="3" autocomplete="off" />
+  <button id="mark-seen">Mark as Seen</button>
+  <button id="voice-input-btn" type="button" disabled>🎤 Start Voice Input</button>
+  <span id="voice-status"></span>
+  <br/>
+  <button id="show-unseen">Show Unseen départements</button>
+  <div id="map"></div>
+  <div id="unseen-table-container"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    const map = L.map("map").setView([46.5, 2.5], 6);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 10,
+      attribution: '© OpenStreetMap contributors',
+    }).addTo(map);
+
+    const deptLayers = {};
+    let seenDepts = JSON.parse(localStorage.getItem("seenDepts") || "{}");
+    let departementsList = [];
+
+    let currentSortColumn = null;
+    let currentSortAsc = true;
+
+    function style(feature) {
+      const num = feature.properties.code;
+      return {
+        fillColor: seenDepts[num] ? "green" : "red",
+        weight: 1,
+        opacity: 1,
+        color: "white",
+        fillOpacity: 0.7,
+      };
+    }
+
+    async function loadDepartements() {
+      const response = await fetch(
+        "https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements.geojson"
+      );
+      const geojson = await response.json();
+
+      departementsList = geojson.features.map(f => ({
+        code: f.properties.code,
+        name: f.properties.nom,
+      }));
+
+      L.geoJSON(geojson, {
+        style: style,
+        onEachFeature: (feature, layer) => {
+          const num = feature.properties.code;
+          deptLayers[num] = layer;
+
+          layer.bindPopup(
+            `<strong>${feature.properties.nom}</strong><br>Département: ${num}`
+          );
+
+          const centroid = layer.getBounds().getCenter();
+          const label = L.marker(centroid, {
+            icon: L.divIcon({
+              className: "dept-label",
+              html: num,
+            }),
+            interactive: false,
+          }).addTo(map);
+          layer._label = label;
+
+          // Click toggles seen state and updates localStorage
+          layer.on("click", () => {
+            if (seenDepts[num]) {
+              delete seenDepts[num];
+              layer.setStyle({ fillColor: "red" });
+            } else {
+              seenDepts[num] = true;
+              layer.setStyle({ fillColor: "green" });
+            }
+            localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
+          });
+        },
+      }).addTo(map);
+    }
+
+    loadDepartements();
+
+    document.getElementById("mark-seen").onclick = () => {
+      const input = document.getElementById("dept-input").value.trim();
+      if (deptLayers[input]) {
+        seenDepts[input] = true;
+        deptLayers[input].setStyle({ fillColor: "green" });
+        deptLayers[input].openPopup();
+        localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
+      } else {
+        alert("Invalid département number");
+      }
+    };
+
+    function sortDepartements(list, column, asc) {
+      return list.sort((a, b) => {
+        let v1 = a[column];
+        let v2 = b[column];
+        if (column === "code") {
+          v1 = Number(v1);
+          v2 = Number(v2);
+        } else {
+          v1 = v1.toLowerCase();
+          v2 = v2.toLowerCase();
+        }
+        if (v1 > v2) return asc ? 1 : -1;
+        if (v1 < v2) return asc ? -1 : 1;
+        return 0;
+      });
+    }
+
+    function renderTable(unseen) {
+      if (unseen.length === 0) {
+        document.getElementById("unseen-table-container").innerHTML =
+          "<p>All départements have been seen!</p>";
+        return;
+      }
+
+      let html = "<table><thead><tr>";
+      html += `<th data-column="code">Département Code</th><th data-column="name">Name</th>`;
+      html += "</tr></thead><tbody>";
+
+      for (const d of unseen) {
+        html += `<tr><td>${d.code}</td><td>${d.name}</td></tr>`;
+      }
+      html += "</tbody></table>";
+
+      document.getElementById("unseen-table-container").innerHTML = html;
+
+      const headers = document.querySelectorAll("#unseen-table-container th");
+      headers.forEach(header => {
+        header.classList.remove("sort-asc", "sort-desc");
+        if (header.dataset.column === currentSortColumn) {
+          header.classList.add(currentSortAsc ? "sort-asc" : "sort-desc");
+        }
+        header.style.cursor = "pointer";
+        header.onclick = () => {
+          const column = header.dataset.column;
+          if (currentSortColumn === column) {
+            currentSortAsc = !currentSortAsc;
+          } else {
+            currentSortColumn = column;
+            currentSortAsc = true;
+          }
+          const unseenSorted = sortDepartements(unseen.slice(), currentSortColumn, currentSortAsc);
+          renderTable(unseenSorted);
+        };
+      });
+    }
+
+    document.getElementById("show-unseen").onclick = () => {
+      if (!departementsList.length) {
+        alert("Departements data not loaded yet.");
+        return;
+      }
+      const unseen = departementsList.filter(d => !seenDepts[d.code]);
+      currentSortColumn = "code";
+      currentSortAsc = true;
+      const unseenSorted = sortDepartements(unseen.slice(), currentSortColumn, currentSortAsc);
+      renderTable(unseenSorted);
+    };
+
+    // Voice input integration
+    const voiceBtn = document.getElementById("voice-input-btn");
+    const voiceStatus = document.getElementById("voice-status");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'fr-FR';  // French language
+
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      voiceBtn.disabled = false;
+
+      voiceBtn.onclick = () => {
+        recognition.start();
+        voiceBtn.disabled = true;
+        voiceBtn.textContent = '🎤 Listening...';
+        voiceStatus.textContent = '';
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim();
+        const input = document.getElementById("dept-input");
+        input.value = transcript;
+        voiceStatus.textContent = `Heard: "${transcript}"`;
+      };
+
+      recognition.onend = () => {
+        voiceBtn.disabled = false;
+        voiceBtn.textContent = '🎤 Start Voice Input';
+      };
+
+      recognition.onerror = (event) => {
+        voiceStatus.textContent = "Error: " + event.error;
+        voiceBtn.disabled = false;
+        voiceBtn.textContent = '🎤 Start Voice Input';
+      };
+    } else {
+      voiceStatus.textContent = "Voice input not supported in this browser.";
+    }
+  </script>
+</body>
+</html>
