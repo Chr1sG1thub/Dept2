@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>French Département Tracker with Voice Feedback</title>
+  <title>French Département Tracker with Simplified Voice Feedback</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link
     rel="stylesheet"
@@ -98,7 +98,7 @@
       };
     }
 
-    // Function to speak a given text aloud
+    // Function to speak only the département name aloud
     function speakText(text) {
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text);
@@ -145,9 +145,8 @@
             } else {
               seenDepts[num] = true;
               layer.setStyle({ fillColor: "green" });
-              // Announce département name
               const dept = departementsList.find(d => d.code === num);
-              if (dept) speakText(`Département ${dept.name} marked as seen`);
+              if (dept) speakText(dept.name);
             }
             localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
           });
@@ -165,7 +164,7 @@
         deptLayers[input].openPopup();
         localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
         const dept = departementsList.find(d => d.code === input);
-        if (dept) speakText(`Département ${dept.name} marked as seen`);
+        if (dept) speakText(dept.name);
       } else {
         alert("Invalid département number");
       }
@@ -239,6 +238,7 @@
       renderTable(unseenSorted);
     };
 
+    // Convert English number words (up to 99), with special "2A", "2B", and "to be"
     function englishWordsToNumber(text) {
       const numbers = {
         "zero":0,"one":1,"two":2,"three":3,"four":4,"five":5,"six":6,"seven":7,"eight":8,"nine":9,
@@ -248,9 +248,8 @@
       };
       text = text.toLowerCase().trim();
 
-      // Special cases for Corsica départements
       if (text === "two a" || text === "2 a" || text === "to a") return "2A";
-      if (text === "two b" || text === "2 b" || text === "to b") return "2B";
+      if (text === "two b" || text === "2 b" || text === "to b" || text === "to be") return "2B";
 
       if (numbers[text] !== undefined) return numbers[text].toString();
 
@@ -297,9 +296,8 @@
           deptLayers[converted].openPopup();
           localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
 
-          // Announce département name
           const dept = departementsList.find(d => d.code === converted);
-          if (dept) speakText(`Département ${dept.name} marked as seen`);
+          if (dept) speakText(dept.name);
         } else {
           voiceStatus.textContent += " (Invalid département number)";
         }
