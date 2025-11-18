@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>French Département Plate Tracker with English Voice Input</title>
+  <title>French Département Plate Tracker with Voice Input and Special Cases</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link
     rel="stylesheet"
@@ -226,7 +226,7 @@
       renderTable(unseenSorted);
     };
 
-    // Convert English number words (up to 99) to digits
+    // Convert English number words (up to 99), including special "2A", "2B" cases
     function englishWordsToNumber(text) {
       const numbers = {
         "zero":0,"one":1,"two":2,"three":3,"four":4,"five":5,"six":6,"seven":7,"eight":8,"nine":9,
@@ -235,6 +235,11 @@
         "sixty":60,"seventy":70,"eighty":80,"ninety":90
       };
       text = text.toLowerCase().trim();
+
+      // Special cases for Corsica départements
+      if (text === "two a" || text === "2 a" || text === "to a") return "2A";
+      if (text === "two b" || text === "2 b" || text === "to b") return "2B";
+
       if (numbers[text] !== undefined) return numbers[text].toString();
 
       let parts = text.split(/[\s-]+/);
@@ -244,7 +249,7 @@
           total += numbers[part];
         }
       });
-      return total > 0 ? total.toString() : text;
+      return total > 0 ? total.toString() : text.toUpperCase();
     }
 
     const voiceBtn = document.getElementById("voice-input-btn");
@@ -273,6 +278,16 @@
         const converted = englishWordsToNumber(transcript);
         input.value = converted;
         voiceStatus.textContent = `Heard: "${transcript}" → "${converted}"`;
+
+        // Auto mark as seen and update map
+        if (deptLayers[converted]) {
+          seenDepts[converted] = true;
+          deptLayers[converted].setStyle({ fillColor: "green" });
+          deptLayers[converted].openPopup();
+          localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
+        } else {
+          voiceStatus.textContent += " (Invalid département number)";
+        }
       };
 
       recognition.onend = () => {
