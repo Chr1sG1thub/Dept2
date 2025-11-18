@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>French Département Tracker with Simplified Voice Feedback</title>
+  <title>French Département Tracker with Voice Feedback and Flashing</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link
     rel="stylesheet"
@@ -98,6 +98,26 @@
       };
     }
 
+    function flashDepartement(num) {
+      if (!deptLayers[num]) return;
+      let layer = deptLayers[num];
+      let flashDuration = 2000; // milliseconds
+      let flashInterval = 300; 
+      let elapsed = 0;
+      let isGreen = false;
+
+      let intervalId = setInterval(() => {
+        layer.setStyle({ fillColor: isGreen ? "red" : "green" });
+        isGreen = !isGreen;
+        elapsed += flashInterval;
+        if (elapsed >= flashDuration) {
+          clearInterval(intervalId);
+          // Final color solid green
+          layer.setStyle({ fillColor: "green" });
+        }
+      }, flashInterval);
+    }
+
     // Function to speak only the département name aloud
     function speakText(text) {
       if ('speechSynthesis' in window) {
@@ -144,7 +164,8 @@
               layer.setStyle({ fillColor: "red" });
             } else {
               seenDepts[num] = true;
-              layer.setStyle({ fillColor: "green" });
+              localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
+              flashDepartement(num);
               const dept = departementsList.find(d => d.code === num);
               if (dept) speakText(dept.name);
             }
@@ -160,9 +181,9 @@
       const input = document.getElementById("dept-input").value.trim();
       if (deptLayers[input]) {
         seenDepts[input] = true;
-        deptLayers[input].setStyle({ fillColor: "green" });
-        deptLayers[input].openPopup();
         localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
+        flashDepartement(input);
+        deptLayers[input].openPopup();
         const dept = departementsList.find(d => d.code === input);
         if (dept) speakText(dept.name);
       } else {
@@ -292,9 +313,9 @@
 
         if (deptLayers[converted]) {
           seenDepts[converted] = true;
-          deptLayers[converted].setStyle({ fillColor: "green" });
-          deptLayers[converted].openPopup();
           localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
+          flashDepartement(converted);
+          deptLayers[converted].openPopup();
 
           const dept = departementsList.find(d => d.code === converted);
           if (dept) speakText(dept.name);
