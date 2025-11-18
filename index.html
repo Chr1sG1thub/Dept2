@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>French Département Plate Tracker with Voice Input</title>
+  <title>French Département Plate Tracker with English Voice Input</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link
     rel="stylesheet"
@@ -226,14 +226,34 @@
       renderTable(unseenSorted);
     };
 
-    // Voice input integration
+    // Convert English number words (up to 99) to digits
+    function englishWordsToNumber(text) {
+      const numbers = {
+        "zero":0,"one":1,"two":2,"three":3,"four":4,"five":5,"six":6,"seven":7,"eight":8,"nine":9,
+        "ten":10,"eleven":11,"twelve":12,"thirteen":13,"fourteen":14,"fifteen":15,"sixteen":16,
+        "seventeen":17,"eighteen":18,"nineteen":19,"twenty":20,"thirty":30,"forty":40,"fifty":50,
+        "sixty":60,"seventy":70,"eighty":80,"ninety":90
+      };
+      text = text.toLowerCase().trim();
+      if (numbers[text] !== undefined) return numbers[text].toString();
+
+      let parts = text.split(/[\s-]+/);
+      let total = 0;
+      parts.forEach(part => {
+        if (numbers[part] !== undefined) {
+          total += numbers[part];
+        }
+      });
+      return total > 0 ? total.toString() : text;
+    }
+
     const voiceBtn = document.getElementById("voice-input-btn");
     const voiceStatus = document.getElementById("voice-status");
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.lang = 'fr-FR';  // French language
+      recognition.lang = 'en-US';  // English language
 
       recognition.continuous = false;
       recognition.interimResults = false;
@@ -250,8 +270,9 @@
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript.trim();
         const input = document.getElementById("dept-input");
-        input.value = transcript;
-        voiceStatus.textContent = `Heard: "${transcript}"`;
+        const converted = englishWordsToNumber(transcript);
+        input.value = converted;
+        voiceStatus.textContent = `Heard: "${transcript}" → "${converted}"`;
       };
 
       recognition.onend = () => {
