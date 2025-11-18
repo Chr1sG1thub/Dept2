@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>French Département Tracker with Voice Feedback and Flashing</title>
+  <title>French Département Tracker with Improved Voice Feedback</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link
     rel="stylesheet"
@@ -100,29 +100,48 @@
 
     function flashDepartement(num) {
       if (!deptLayers[num]) return;
-      let layer = deptLayers[num];
-      let flashDuration = 2000; // milliseconds
-      let flashInterval = 300; 
+      const layer = deptLayers[num];
+      const flashDuration = 2000;
+      const flashInterval = 300;
       let elapsed = 0;
       let isGreen = false;
 
-      let intervalId = setInterval(() => {
+      const intervalId = setInterval(() => {
         layer.setStyle({ fillColor: isGreen ? "red" : "green" });
         isGreen = !isGreen;
         elapsed += flashInterval;
         if (elapsed >= flashDuration) {
           clearInterval(intervalId);
-          // Final color solid green
           layer.setStyle({ fillColor: "green" });
         }
       }, flashInterval);
     }
 
-    // Function to speak only the département name aloud
+    let synthVoices = [];
+    let selectedVoice = null;
+
+    // Load voices for speech synthesis
+    function loadVoices() {
+      synthVoices = window.speechSynthesis.getVoices();
+      // Select a voice matching 'en-US' language best for iOS Safari and others
+      selectedVoice = synthVoices.find(v => v.lang.toLowerCase().startsWith('en-us')) || synthVoices[0];
+    }
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+      loadVoices();
+    }
+
     function speakText(text) {
       if ('speechSynthesis' in window) {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel(); // Cancel previous utterance if any
+        }
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
         window.speechSynthesis.speak(utterance);
       }
     }
@@ -169,7 +188,6 @@
               const dept = departementsList.find(d => d.code === num);
               if (dept) speakText(dept.name);
             }
-            localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
           });
         },
       }).addTo(map);
