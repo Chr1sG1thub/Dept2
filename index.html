@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>French Département Plate Tracker with Voice Input and Special Cases</title>
+  <title>French Département Tracker with Voice Feedback</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link
     rel="stylesheet"
@@ -98,6 +98,15 @@
       };
     }
 
+    // Function to speak a given text aloud
+    function speakText(text) {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
     async function loadDepartements() {
       const response = await fetch(
         "https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements.geojson"
@@ -129,7 +138,6 @@
           }).addTo(map);
           layer._label = label;
 
-          // Click toggles seen state and updates localStorage
           layer.on("click", () => {
             if (seenDepts[num]) {
               delete seenDepts[num];
@@ -137,6 +145,9 @@
             } else {
               seenDepts[num] = true;
               layer.setStyle({ fillColor: "green" });
+              // Announce département name
+              const dept = departementsList.find(d => d.code === num);
+              if (dept) speakText(`Département ${dept.name} marked as seen`);
             }
             localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
           });
@@ -153,6 +164,8 @@
         deptLayers[input].setStyle({ fillColor: "green" });
         deptLayers[input].openPopup();
         localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
+        const dept = departementsList.find(d => d.code === input);
+        if (dept) speakText(`Département ${dept.name} marked as seen`);
       } else {
         alert("Invalid département number");
       }
@@ -226,7 +239,6 @@
       renderTable(unseenSorted);
     };
 
-    // Convert English number words (up to 99), including special "2A", "2B" cases
     function englishWordsToNumber(text) {
       const numbers = {
         "zero":0,"one":1,"two":2,"three":3,"four":4,"five":5,"six":6,"seven":7,"eight":8,"nine":9,
@@ -258,7 +270,7 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';  // English language
+      recognition.lang = 'en-US';
 
       recognition.continuous = false;
       recognition.interimResults = false;
@@ -279,12 +291,15 @@
         input.value = converted;
         voiceStatus.textContent = `Heard: "${transcript}" → "${converted}"`;
 
-        // Auto mark as seen and update map
         if (deptLayers[converted]) {
           seenDepts[converted] = true;
           deptLayers[converted].setStyle({ fillColor: "green" });
           deptLayers[converted].openPopup();
           localStorage.setItem("seenDepts", JSON.stringify(seenDepts));
+
+          // Announce département name
+          const dept = departementsList.find(d => d.code === converted);
+          if (dept) speakText(`Département ${dept.name} marked as seen`);
         } else {
           voiceStatus.textContent += " (Invalid département number)";
         }
